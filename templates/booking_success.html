@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Booking Confirmed | QuickNeed{% endblock %}
+
+{% block content %}
+<section class="success-card">
+    <div class="success-badge">✓</div>
+    <span class="eyebrow">Booking confirmed</span>
+    <h1>Your service has been booked.</h1>
+    <p>{{ booking.service }} with {{ booking.provider }} is scheduled for {{ booking.date }} at {{ booking.time }}.</p>
+
+    <div class="success-details">
+        <div>
+            <strong>Service</strong>
+            <span>{{ booking.service }}</span>
+        </div>
+        <div>
+            <strong>Provider</strong>
+            <span>{{ booking.provider }}</span>
+        </div>
+        <div>
+            <strong>Status</strong>
+            <span>{{ booking.status }}</span>
+        </div>
+        <div>
+            <strong>Amount</strong>
+            <span>Rs. {{ booking.amount or 0 }}</span>
+        </div>
+    </div>
+
+    <div class="profile-actions">
+        <a class="primary-btn wide-btn" href="{{ url_for('my_bookings') }}">View my bookings</a>
+        <a class="secondary-btn wide-btn" href="{{ url_for('home') }}">Back to home</a>
+    </div>
+</section>
+{% endblock %}

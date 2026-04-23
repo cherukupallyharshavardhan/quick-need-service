@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Quick Need Service icon">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f766e" />
+      <stop offset="100%" stop-color="#ff7a59" />
+    </linearGradient>
+  </defs>
+  <rect x="32" y="32" width="448" height="448" rx="120" fill="url(#bg)" />
+  <circle cx="256" cy="188" r="62" fill="#fff6ea" opacity="0.96" />
+  <path d="M154 322c0-54 44-98 98-98h20c54 0 98 44 98 98v24H154z" fill="#fff6ea" opacity="0.96" />
+  <path d="M316 116l84 50-84 50z" fill="#f7b538" />
+</svg>
