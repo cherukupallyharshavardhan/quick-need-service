@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Book {{ service.name }} | Quick Need{% endblock %}
+
+{% block content %}
+<section class="booking-layout">
+    <article class="summary-card">
+        <span class="eyebrow">Booking summary</span>
+        <h1>{{ service.name }}</h1>
+        <p>{{ service.tagline }}</p>
+
+        <div class="summary-block">
+            <strong>Assigned provider</strong>
+            <span>{{ provider.name }}</span>
+        </div>
+        <div class="summary-block">
+            <strong>Arrival estimate</strong>
+            <span>{{ provider.eta }}</span>
+        </div>
+        <div class="summary-block">
+            <strong>Starting price</strong>
+            <span>Rs. {{ provider.price }}</span>
+        </div>
+        <div class="summary-block">
+            <strong>Contact</strong>
+            <span>{{ provider.phone }}</span>
+        </div>
+    </article>
+
+    <form method="POST" class="booking-form">
+        <h2>Tell us what you need</h2>
+
+        <label>Name</label>
+        <input type="text" name="name" value="{{ current_user.full_name if current_user else '' }}" placeholder="Customer name" required>
+
+        <label>Phone</label>
+        <input type="text" name="phone" value="{{ current_user.phone if current_user else '' }}" placeholder="Contact number" required>
+
+        <label>Address</label>
+        <textarea name="address" rows="3" placeholder="House number, area, landmark" required></textarea>
+
+        <div class="form-grid">
+            <div>
+                <label>Date</label>
+                <input type="date" name="date" min="{{ today }}" required>
+            </div>
+            <div>
+                <label>Time</label>
+                <input type="time" name="time" required>
+            </div>
+        </div>
+
+        <label>Issue details</label>
+        <textarea name="issue" rows="4" placeholder="Describe the problem or request clearly" required></textarea>
+
+        <button type="submit" class="primary-btn wide-btn">Confirm booking</button>
+    </form>
+</section>
+{% endblock %}

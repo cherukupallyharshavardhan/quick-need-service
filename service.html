@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}{{ service.name }} | Quick Need{% endblock %}
+
+{% block content %}
+<section class="section-head">
+    <div>
+        <span class="eyebrow">Provider selection</span>
+        <h1>{{ service.name }}</h1>
+        <p>{{ service.tagline }}</p>
+    </div>
+    <a class="secondary-btn" href="{{ url_for('home') }}">Back to home</a>
+</section>
+
+<section class="provider-grid">
+    {% for provider in providers %}
+    <article class="provider-card">
+        <div class="provider-top">
+            <div>
+                <h3>{{ provider.name }}</h3>
+                <p>{{ provider.badge }}</p>
+            </div>
+            <span class="rating-pill">★ {{ provider.rating }}</span>
+        </div>
+
+        <div class="provider-meta">
+            <span>{{ provider.experience }}</span>
+            <span>{{ provider.eta }}</span>
+            <span>Rs. {{ provider.price }}</span>
+        </div>
+
+        <p class="provider-phone">Phone: {{ provider.phone }}</p>
+        <a class="primary-btn wide-btn" href="{{ url_for('book_service', service_slug=service_slug, provider_slug=provider.slug) }}">Book {{ provider.name }}</a>
+    </article>
+    {% endfor %}
+</section>
+{% endblock %}

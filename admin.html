@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard | Quick Need{% endblock %}
+
+{% block content %}
+<section class="section-head">
+    <div>
+        <span class="eyebrow">Administration</span>
+        <h1>QuickNeed Admin Control Panel</h1>
+        <p>Review customer requests, manage service categories, and control provider access from one dashboard.</p>
+    </div>
+    <a class="secondary-btn" href="{{ url_for('logout') }}">Logout</a>
+</section>
+
+<section class="stats-row admin-stats">
+    <article class="stat-card">
+        <span>Total bookings</span>
+        <strong>{{ stats.total }}</strong>
+        <small>Across all services</small>
+    </article>
+    <article class="stat-card">
+        <span>Pending</span>
+        <strong>{{ stats.pending }}</strong>
+        <small>Need review</small>
+    </article>
+    <article class="stat-card">
+        <span>Completed</span>
+        <strong>{{ stats.completed }}</strong>
+        <small>Finished jobs</small>
+    </article>
+    <article class="stat-card">
+        <span>Total users</span>
+        <strong>{{ user_count }}</strong>
+        <small>Registered customer accounts</small>
+    </article>
+    <article class="stat-card">
+        <span>Services</span>
+        <strong>{{ service_count }}</strong>
+        <small>Editable by admin</small>
+    </article>
+    <article class="stat-card">
+        <span>Providers</span>
+        <strong>{{ provider_count }}</strong>
+        <small>Editable by admin</small>
+    </article>
+</section>
+
+<section class="admin-grid">
+    <div class="admin-panel">
+        <div class="panel-head">
+            <h2>Booking Management</h2>
+            <p>Approve, complete, or cancel customer requests.</p>
+        </div>
+        <div class="booking-table-shell">
+            <table class="booking-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Customer</th>
+                        <th>Service</th>
+                        <th>Provider</th>
+                        <th>Schedule</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for booking in bookings %}
+                    <tr>
+                        <td>#{{ booking.id }}</td>
+                        <td>
+                            <strong>{{ booking.name }}</strong>
+                            <small>{{ booking.user_email }}</small>
+                        </td>
+                        <td>
+                            <strong>{{ booking.service }}</strong>
+                            <small>{{ booking.issue }}</small>
+                        </td>
+                        <td>
+                            <strong>{{ booking.provider }}</strong>
+                            <small>{{ booking.provider_phone or 'N/A' }}</small>
+                        </td>
+                        <td>{{ booking.date }}<br>{{ booking.time }}</td>
+                        <td>
+                            <span class="status-pill status-{{ booking.status|lower|replace(' ', '-') }}">{{ booking.status }}</span>
+                        </td>
+                        <td class="actions-cell">
+                            <a class="table-action" href="{{ url_for('update_status', booking_id=booking.id, status='Accepted') }}">Accept</a>
+                            <a class="table-action" href="{{ url_for('update_status', booking_id=booking.id, status='In-Progress') }}">In progress</a>
+                            <a class="table-action" href="{{ url_for('update_status', booking_id=booking.id, status='Completed') }}">Complete</a>
+                            <a class="table-action danger-link" href="{{ url_for('update_status', booking_id=booking.id, status='Cancelled') }}">Cancel</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="admin-panel">
+        <div class="panel-head">
+            <h2>Service Management</h2>
+            <p>Add, edit, or delete service categories visible to customers.</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('save_service') }}" class="admin-form">
+            <h3>Add New Service</h3>
+            <div class="form-grid">
+                <div>
+                    <label>Name</label>
+                    <input type="text" name="name" required>
+                </div>
+                <div>
+                    <label>Slug</label>
+                    <input type="text" name="slug" placeholder="electrician">
+                </div>
+            </div>
+            <label>Tagline</label>
+            <input type="text" name="tagline" required>
+            <div class="form-grid">
+                <div>
+                    <label>Icon</label>
+                    <input type="text" name="icon" placeholder="EL">
+                </div>
+                <div>
+                    <label>Price From</label>
+                    <input type="number" name="price_from" min="0" value="0">
+                </div>
+            </div>
+            <div class="form-grid">
+                <div>
+                    <label>Accent</label>
+                    <input type="text" name="accent" placeholder="blue">
+                </div>
+                <div>
+                    <label>Image URL</label>
+                    <input type="text" name="image">
+                </div>
+            </div>
+            <button type="submit" class="primary-btn">Add service</button>
+        </form>
+
+        <div class="admin-card-list">
+            {% for service in services %}
+            <form method="POST" action="{{ url_for('save_service') }}" class="admin-edit-card">
+                <input type="hidden" name="current_slug" value="{{ service.slug }}">
+                <div class="admin-edit-head">
+                    <h3>{{ service.name }}</h3>
+                    <a class="danger-link" href="{{ url_for('delete_service', service_slug=service.slug) }}">Delete</a>
+                </div>
+                <div class="form-grid">
+                    <div>
+                        <label>Name</label>
+                        <input type="text" name="name" value="{{ service.name }}" required>
+                    </div>
+                    <div>
+                        <label>Slug</label>
+                        <input type="text" name="slug" value="{{ service.slug }}" required>
+                    </div>
+                </div>
+                <label>Tagline</label>
+                <input type="text" name="tagline" value="{{ service.tagline }}" required>
+                <div class="form-grid">
+                    <div>
+                        <label>Icon</label>
+                        <input type="text" name="icon" value="{{ service.icon }}">
+                    </div>
+                    <div>
+                        <label>Price From</label>
+                        <input type="number" name="price_from" min="0" value="{{ service.price_from }}">
+                    </div>
+                </div>
+                <div class="form-grid">
+                    <div>
+                        <label>Accent</label>
+                        <input type="text" name="accent" value="{{ service.accent }}">
+                    </div>
+                    <div>
+                        <label>Image URL</label>
+                        <input type="text" name="image" value="{{ service.image }}">
+                    </div>
+                </div>
+                <button type="submit" class="secondary-btn">Save service</button>
+            </form>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="admin-panel">
+        <div class="panel-head">
+            <h2>Provider Management</h2>
+            <p>Add, edit, or delete providers and assign them to services.</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('save_provider') }}" class="admin-form">
+            <h3>Add New Provider</h3>
+            <div class="form-grid">
+                <div>
+                    <label>Service</label>
+                    <select name="service_slug" required>
+                        {% for service in services %}
+                        <option value="{{ service.slug }}">{{ service.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label>Name</label>
+                    <input type="text" name="name" required>
+                </div>
+            </div>
+            <div class="form-grid">
+                <div>
+                    <label>Slug</label>
+                    <input type="text" name="slug" placeholder="provider-slug">
+                </div>
+                <div>
+                    <label>Rating</label>
+                    <input type="number" name="rating" step="0.1" min="0" max="5" value="4.5">
+                </div>
+            </div>
+            <div class="form-grid">
+                <div>
+                    <label>Experience</label>
+                    <input type="text" name="experience" placeholder="5 years">
+                </div>
+                <div>
+                    <label>ETA</label>
+                    <input type="text" name="eta" placeholder="40 min">
+                </div>
+            </div>
+            <div class="form-grid">
+                <div>
+                    <label>Price</label>
+                    <input type="number" name="price" min="0" value="0">
+                </div>
+                <div>
+                    <label>Phone</label>
+                    <input type="text" name="phone">
+                </div>
+            </div>
+            <label>Badge</label>
+            <input type="text" name="badge" placeholder="Fast response">
+            <button type="submit" class="primary-btn">Add provider</button>
+        </form>
+
+        <div class="admin-card-list">
+            {% for provider in providers %}
+            <form method="POST" action="{{ url_for('save_provider') }}" class="admin-edit-card">
+                <input type="hidden" name="provider_id" value="{{ provider.id }}">
+                <div class="admin-edit-head">
+                    <h3>{{ provider.name }}</h3>
+                    <a class="danger-link" href="{{ url_for('delete_provider', provider_id=provider.id) }}">Delete</a>
+                </div>
+                <div class="form-grid">
+                    <div>
+                        <label>Service</label>
+                        <select name="service_slug" required>
+                            {% for service in services %}
+                            <option value="{{ service.slug }}" {% if service.slug == provider.service_slug %}selected{% endif %}>{{ service.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Name</label>
+                        <input type="text" name="name" value="{{ provider.name }}" required>
+                    </div>
+                </div>
+                <div class="form-grid">
+                    <div>
+                        <label>Slug</label>
+                        <input type="text" name="slug" value="{{ provider.slug }}" required>
+                    </div>
+                    <div>
+                        <label>Rating</label>
+                        <input type="number" name="rating" step="0.1" min="0" max="5" value="{{ provider.rating }}">
+                    </div>
+                </div>
+                <div class="form-grid">
+                    <div>
+                        <label>Experience</label>
+                        <input type="text" name="experience" value="{{ provider.experience }}">
+                    </div>
+                    <div>
+                        <label>ETA</label>
+                        <input type="text" name="eta" value="{{ provider.eta }}">
+                    </div>
+                </div>
+                <div class="form-grid">
+                    <div>
+                        <label>Price</label>
+                        <input type="number" name="price" min="0" value="{{ provider.price }}">
+                    </div>
+                    <div>
+                        <label>Phone</label>
+                        <input type="text" name="phone" value="{{ provider.phone }}">
+                    </div>
+                </div>
+                <label>Badge</label>
+                <input type="text" name="badge" value="{{ provider.badge }}">
+                <button type="submit" class="secondary-btn">Save provider</button>
+            </form>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endblock %}

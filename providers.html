@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ service | capitalize }} Providers</title>
+</head>
+<body>
+
+<h2>{{ service | capitalize }} Service Providers</h2>
+
+{% if providers %}
+    {% for p in providers %}
+        <div style="border:1px solid #ddd; padding:15px; margin:15px 0;">
+    <h3>{{ p.name }}</h3>
+    <p>📞 Phone: {{ p.phone }}</p>
+    <p>⭐ Rating: {{ p.rating }}</p>
+
+    <a href="/book/{{ service }}/{{ p.name }}">
+        <button>Book Service</button>
+    </a>
+</div>
+
+    {% endfor %}
+{% else %}
+    <p>No providers available right now.</p>
+{% endif %}
+
+<a href="/home">← Back to Services</a>
+
+</body>
+</html>
