@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Home | QuickNeed{% endblock %}
+
+{% block content %}
+<section class="mobile-topbar">
+    <div class="home-topbar-row">
+        <div class="location-chip">
+            <span class="location-label">Location</span>
+            <strong>{{ current_user.city or 'Set location' }}</strong>
+        </div>
+        <a class="profile-mini" href="{{ url_for('profile') }}">
+            {{ (current_user.full_name or current_user.email)[0]|upper }}
+        </a>
+    </div>
+
+    <div class="brand-row compact">
+        <div>
+            <h1>QuickNeed</h1>
+            <p>{{ user_name }}</p>
+        </div>
+    </div>
+</section>
+
+<form method="GET" action="{{ url_for('home') }}" class="service-search-form">
+    <input type="text" name="q" value="{{ search_query }}" placeholder="Search services">
+    <button type="submit" class="primary-btn">Search</button>
+</form>
+
+<section class="home-hero-panel">
+    <div>
+        <span class="eyebrow">Ready to book</span>
+        <h2>Find the right home service in minutes.</h2>
+        <p>Browse categories, compare providers, and track every booking from one place.</p>
+    </div>
+</section>
+
+<section class="service-mobile-grid">
+    {% for service in services %}
+    <a class="service-mobile-card" href="{{ url_for('service_detail', service_slug=service.slug) }}">
+        <div class="service-cover" style="background-image: linear-gradient(180deg, rgba(20,40,71,0.04), rgba(20,40,71,0.14)), url('{{ service.image }}');"></div>
+        <div class="service-card-copy">
+            <h3>{{ service.name }}</h3>
+            <p>{{ service.tagline }}</p>
+        </div>
+    </a>
+    {% endfor %}
+</section>
+
+{% if not services %}
+<section class="bookings-empty">
+    <div class="empty-icon">S</div>
+    <h3>No matching services</h3>
+    <p>Try another search term.</p>
+</section>
+{% endif %}
+{% endblock %}

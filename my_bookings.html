@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}My Bookings | QuickNeed{% endblock %}
+
+{% block content %}
+<section class="mobile-page-head">
+    <h1>My Bookings</h1>
+</section>
+
+<section class="segmented-tabs">
+    <a class="segment {% if active_tab == 'upcoming' %}active{% endif %}" href="{{ url_for('my_bookings', tab='upcoming') }}">Upcoming</a>
+    <a class="segment {% if active_tab == 'completed' %}active{% endif %}" href="{{ url_for('my_bookings', tab='completed') }}">Completed</a>
+    <a class="segment {% if active_tab == 'cancelled' %}active{% endif %}" href="{{ url_for('my_bookings', tab='cancelled') }}">Cancelled</a>
+</section>
+
+{% if filtered_bookings %}
+<section class="mobile-booking-list">
+    {% for booking in filtered_bookings %}
+    <article class="mobile-booking-card">
+        <div class="mobile-booking-head">
+            <div>
+                <h3>{{ booking.service }}</h3>
+                <p>{{ booking.provider }}</p>
+            </div>
+            <span class="status-pill status-{{ booking.status|lower|replace(' ', '-') }}">{{ booking.status }}</span>
+        </div>
+        <p class="booking-detail-line">{{ booking.date }} at {{ booking.time }}</p>
+        <p class="booking-detail-line">{{ booking.issue }}</p>
+        <p class="booking-detail-line">Rs. {{ booking.amount or 0 }}</p>
+
+        {% set status = booking.status|lower %}
+        {% if active_tab == 'upcoming' and status not in ['completed', 'cancelled', 'cancel requested'] %}
+        <a class="cancel-text-link" href="{{ url_for('request_cancel', booking_id=booking.id) }}">Cancel</a>
+        {% endif %}
+    </article>
+    {% endfor %}
+</section>
+{% else %}
+<section class="bookings-empty">
+    <div class="empty-icon">◫</div>
+    {% if active_tab == 'completed' %}
+    <h3>No completed bookings</h3>
+    <p>Your completed services will appear here.</p>
+    {% elif active_tab == 'cancelled' %}
+    <h3>No cancelled bookings</h3>
+    <p>Your cancelled services will appear here.</p>
+    {% else %}
+    <h3>No upcoming bookings</h3>
+    <p>Your upcoming services will appear here.</p>
+    {% endif %}
+</section>
+{% endif %}
+{% endblock %}

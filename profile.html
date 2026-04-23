@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Profile | QuickNeed{% endblock %}
+
+{% block content %}
+<section class="mobile-page-head">
+    <h1>Profile</h1>
+</section>
+
+<section class="profile-card">
+    <div class="profile-avatar">{{ (user.full_name or user.email)[0]|upper }}</div>
+    <h2>{{ user.full_name or user.email }}</h2>
+    <p>{{ user.email }}</p>
+    <p>{{ user.phone or 'No phone added' }}</p>
+    <p>{{ user.city or 'City not set' }}</p>
+</section>
+
+<section class="profile-edit-card">
+    <h3>Edit profile</h3>
+    <form method="POST">
+        <label>Full Name</label>
+        <input type="text" name="full_name" value="{{ user.full_name or '' }}" required>
+
+        <label>Phone</label>
+        <input type="text" name="phone" value="{{ user.phone or '' }}" required>
+
+        <label>City</label>
+        <input type="text" name="city" value="{{ user.city or '' }}" required>
+
+        <button type="submit" class="primary-btn wide-btn">Save changes</button>
+    </form>
+</section>
+
+<section class="profile-stats">
+    <article>
+        <strong>{{ stats.total }}</strong>
+        <span>Total</span>
+    </article>
+    <article>
+        <strong>{{ stats.pending }}</strong>
+        <span>Pending</span>
+    </article>
+    <article>
+        <strong>{{ stats.completed }}</strong>
+        <span>Done</span>
+    </article>
+    <article>
+        <strong>{{ stats.cancelled }}</strong>
+        <span>Cancelled</span>
+    </article>
+</section>
+
+{% if latest_booking %}
+<section class="latest-booking-card">
+    <span class="eyebrow">Latest booking</span>
+    <h3>{{ latest_booking.service }}</h3>
+    <p>{{ latest_booking.provider }}</p>
+    <p>{{ latest_booking.date }} at {{ latest_booking.time }}</p>
+    <span class="status-pill status-{{ latest_booking.status|lower|replace(' ', '-') }}">{{ latest_booking.status }}</span>
+</section>
+{% endif %}
+
+<section class="profile-actions">
+    {% if current_role == 'admin' %}
+    <a class="secondary-btn wide-btn" href="{{ url_for('admin_dashboard') }}">Open admin dashboard</a>
+    {% endif %}
+    <a class="secondary-btn wide-btn" href="{{ url_for('logout') }}">Logout</a>
+</section>
+{% endblock %}

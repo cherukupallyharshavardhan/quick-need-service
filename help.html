@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Help & Support | QuickNeed{% endblock %}
+
+{% block content %}
+<section class="mobile-page-head">
+    <h1>Help & Support</h1>
+</section>
+
+<section class="support-grid">
+    <article class="support-card">
+        <div class="support-icon">☎</div>
+        <h3>Call us</h3>
+        <p>24x7 support</p>
+    </article>
+    <article class="support-card">
+        <div class="support-icon">◌</div>
+        <h3>Chat</h3>
+        <p>Average reply 2m</p>
+    </article>
+</section>
+
+<section class="faq-section">
+    <h2>Frequently asked</h2>
+    {% for item in help_items %}
+    <article class="faq-card">
+        <h3>{{ item.question }}</h3>
+        <p>{{ item.answer }}</p>
+    </article>
+    {% endfor %}
+</section>
+{% endblock %}

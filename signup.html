@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Create Account | Quick Need{% endblock %}
+{% block body_class %}auth-body{% endblock %}
+{% block page_shell_class %}auth-shell{% endblock %}
+
+{% block content %}
+<section class="auth-card signup-card">
+    <div class="auth-intro">
+        <span class="eyebrow">Create Account</span>
+        <h1>Set up your customer profile and start booking.</h1>
+        <p>Keep your contact details ready so providers can reach you quickly and arrive on time.</p>
+    </div>
+
+    <form method="POST" class="auth-form">
+        <h2>Register</h2>
+        <label>Full Name</label>
+        <input type="text" name="full_name" placeholder="Your full name" required>
+
+        <label>Email</label>
+        <input type="email" name="email" placeholder="you@example.com" required>
+
+        <label>Phone</label>
+        <input type="text" name="phone" placeholder="10-digit mobile number" required>
+
+        <label>City</label>
+        <input type="text" name="city" placeholder="Your city" required>
+
+        <label>Password</label>
+        <input type="password" name="password" placeholder="Create password" required>
+
+        <label>Confirm Password</label>
+        <input type="password" name="confirm" placeholder="Confirm password" required>
+
+        <button type="submit" class="primary-btn">Create account</button>
+        <p class="muted-line">Already have an account? <a href="{{ url_for('login') }}">Login</a></p>
+    </form>
+</section>
+{% endblock %}
