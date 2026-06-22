@@ -1,23 +1,26 @@
-# OTP Login System for Quick Need Service App
-# Save as app.py
-
 from flask import Flask, render_template_string, request, redirect, session
-import random
+import os
 
-app = Flask(__name__)
-app.secret_key = "quickneed_otp_secret"
+app = Flask(**name**)
+app.secret_key = "quickneed_secret"
 
+# Temporary user storage
 
-# -----------------------------------
-# STEP 1 : MOBILE NUMBER PAGE
-# -----------------------------------
+users = {}
 
-mobile_page = """
+# ----------------------------
+
+# SIGN IN PAGE
+
+# ----------------------------
+
+signin_page = """
+
 <!DOCTYPE html>
+
 <html>
 <head>
-<title>Quick Need Service - OTP Login</title>
-
+<title>Quick Need Service - Sign In</title>
 <style>
 body{
     margin:0;
@@ -28,66 +31,47 @@ body{
     justify-content:center;
     align-items:center;
 }
-
-.login-box{
+.box{
     background:white;
     width:380px;
     padding:40px;
     border-radius:15px;
-    box-shadow:0 15px 35px rgba(0,0,0,0.2);
     text-align:center;
 }
-
-h2{
-    margin-bottom:25px;
-    color:#2c3e50;
-}
-
 input{
     width:100%;
     padding:14px;
     margin:12px 0;
-    border:1px solid #ddd;
-    border-radius:8px;
-    font-size:15px;
 }
-
 button{
     width:100%;
     padding:14px;
     background:#3498db;
-    border:none;
     color:white;
-    font-size:16px;
-    border-radius:8px;
-    cursor:pointer;
+    border:none;
 }
-
-button:hover{
-    background:#2980b9;
+a{
+    text-decoration:none;
 }
 </style>
-
 </head>
 <body>
 
-<div class="login-box">
-
+<div class="box">
 <h2>Quick Need Service</h2>
-<h3>Login with OTP</h3>
+<h3>Sign In</h3>
 
 <form method="POST">
-    <input
-        type="text"
-        name="mobile"
-        placeholder="Enter Mobile Number"
-        required
-    >
+<input type="text" name="mobile" placeholder="Mobile Number" required>
+<input type="password" name="password" placeholder="Password" required>
 
-    <button type="submit">
-        Send OTP
-    </button>
+<button type="submit">Login</button>
+
 </form>
+
+<br>
+
+<a href="/signup">Create New Account</a>
 
 </div>
 
@@ -95,17 +79,19 @@ button:hover{
 </html>
 """
 
+# ----------------------------
 
-# -----------------------------------
-# STEP 2 : OTP VERIFY PAGE
-# -----------------------------------
+# SIGN UP PAGE
 
-otp_page = """
+# ----------------------------
+
+signup_page = """
+
 <!DOCTYPE html>
+
 <html>
 <head>
-<title>Verify OTP</title>
-
+<title>Quick Need Service - Sign Up</title>
 <style>
 body{
     margin:0;
@@ -116,56 +102,48 @@ body{
     justify-content:center;
     align-items:center;
 }
-
 .box{
     background:white;
     width:380px;
     padding:40px;
     border-radius:15px;
-    box-shadow:0 10px 25px rgba(0,0,0,0.1);
     text-align:center;
 }
-
 input{
     width:100%;
     padding:14px;
-    margin:15px 0;
-    border:1px solid #ccc;
-    border-radius:8px;
+    margin:12px 0;
 }
-
 button{
     width:100%;
     padding:14px;
     background:#27ae60;
     color:white;
     border:none;
-    border-radius:8px;
-    font-size:16px;
 }
 </style>
-
 </head>
 <body>
 
 <div class="box">
 
-<h2>Verify OTP</h2>
-
-<p>OTP sent to {{ mobile }}</p>
+<h2>Create Account</h2>
 
 <form method="POST">
-    <input
-        type="text"
-        name="otp"
-        placeholder="Enter OTP"
-        required
-    >
 
-    <button type="submit">
-        Verify OTP
-    </button>
+<input type="text" name="mobile" placeholder="Mobile Number" required>
+
+<input type="password" name="password" placeholder="Password" required>
+
+<button type="submit">
+Create Account
+</button>
+
 </form>
+
+<br>
+
+<a href="/signin">Already have an account?</a>
 
 </div>
 
@@ -173,13 +151,16 @@ button{
 </html>
 """
 
+# ----------------------------
 
-# -----------------------------------
-# STEP 3 : HOME PAGE
-# -----------------------------------
+# HOME PAGE
+
+# ----------------------------
 
 home_page = """
+
 <!DOCTYPE html>
+
 <html>
 <head>
 <title>Quick Need Services</title>
@@ -229,35 +210,37 @@ body{
 <body>
 
 <div class="navbar">
-    <h2>Quick Need Services</h2>
+<h2>Quick Need Services</h2>
 
-    <div>
-        Welcome {{ mobile }}
-        <a href="/logout" style="color:white;margin-left:20px;">
-            Logout
-        </a>
-    </div>
+<div>
+Welcome {{ mobile }}
+
+<a href="/logout"
+style="color:white;margin-left:20px;">
+Logout </a>
+
+</div>
 </div>
 
 <div class="services">
 
-    <div class="card">
-        <h3>Electrician</h3>
-        <p>Fan, wiring, switch repairs</p>
-        <a href="#" class="btn">Book Now</a>
-    </div>
+<div class="card">
+<h3>Electrician</h3>
+<p>Fan, wiring, switch repairs</p>
+<a href="#" class="btn">Book Now</a>
+</div>
 
-    <div class="card">
-        <h3>Plumber</h3>
-        <p>Pipe leakage & water problems</p>
-        <a href="#" class="btn">Book Now</a>
-    </div>
+<div class="card">
+<h3>Plumber</h3>
+<p>Pipe leakage & water problems</p>
+<a href="#" class="btn">Book Now</a>
+</div>
 
-    <div class="card">
-        <h3>AC Repair</h3>
-        <p>AC service & gas refill</p>
-        <a href="#" class="btn">Book Now</a>
-    </div>
+<div class="card">
+<h3>AC Repair</h3>
+<p>AC service & gas refill</p>
+<a href="#" class="btn">Book Now</a>
+</div>
 
 </div>
 
@@ -265,91 +248,83 @@ body{
 </html>
 """
 
+# ----------------------------
 
-# -----------------------------------
-# ROUTE 1 : MOBILE NUMBER LOGIN
-# -----------------------------------
+# ROUTES
 
-@app.route("/", methods=["GET", "POST"])
-def login():
+# ----------------------------
 
-    if request.method == "POST":
-        mobile = request.form["mobile"]
+@app.route("/")
+def root():
+return redirect("/signin")
 
-        # Generate 6-digit OTP
-        otp = random.randint(100000, 999999)
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
 
-        # Save in session
+```
+if request.method == "POST":
+
+    mobile = request.form["mobile"]
+    password = request.form["password"]
+
+    users[mobile] = password
+
+    return redirect("/signin")
+
+return render_template_string(signup_page)
+```
+
+@app.route("/signin", methods=["GET", "POST"])
+def signin():
+
+```
+if request.method == "POST":
+
+    mobile = request.form["mobile"]
+    password = request.form["password"]
+
+    if mobile in users and users[mobile] == password:
+
+        session["logged_in"] = True
         session["mobile"] = mobile
-        session["otp"] = str(otp)
 
-        # Demo OTP shown in terminal
-        print("================================")
-        print("OTP for", mobile, "is:", otp)
-        print("================================")
+        return redirect("/home")
 
-        return redirect("/verify-otp")
+    return "Invalid Login"
 
-    return render_template_string(mobile_page)
-
-
-# -----------------------------------
-# ROUTE 2 : VERIFY OTP
-# -----------------------------------
-
-@app.route("/verify-otp", methods=["GET", "POST"])
-def verify():
-
-    if "mobile" not in session:
-        return redirect("/")
-
-    if request.method == "POST":
-        entered_otp = request.form["otp"]
-
-        if entered_otp == session["otp"]:
-            session["logged_in"] = True
-            return redirect("/home")
-
-    return render_template_string(
-        otp_page,
-        mobile=session["mobile"]
-    )
-
-
-# -----------------------------------
-# ROUTE 3 : HOME
-# -----------------------------------
+return render_template_string(signin_page)
+```
 
 @app.route("/home")
 def home():
 
-    if "logged_in" not in session:
-        return redirect("/")
+```
+if "logged_in" not in session:
+    return redirect("/signin")
 
-    return render_template_string(
-        home_page,
-        mobile=session["mobile"]
-    )
-
-
-# -----------------------------------
-# ROUTE 4 : LOGOUT
-# -----------------------------------
+return render_template_string(
+    home_page,
+    mobile=session["mobile"]
+)
+```
 
 @app.route("/logout")
 def logout():
-    session.clear()
-    return redirect("/")
 
+```
+session.clear()
 
-# -----------------------------------
+return redirect("/signin")
+```
+
+# ----------------------------
+
 # RUN APP
-# -----------------------------------
 
-import os
+# ----------------------------
 
-if __name__ == "__main__":
-    app.run(
-        host="0.0.0.0",
-        port=int(os.environ.get("PORT", 5000))
-    )
+if **name** == "**main**":
+app.run(
+host="0.0.0.0",
+port=int(os.environ.get("PORT", 5000))
+)
