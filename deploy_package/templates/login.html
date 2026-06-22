@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}QuickNeed Login{% endblock %}
+{% block body_class %}auth-body{% endblock %}
+{% block page_shell_class %}auth-shell{% endblock %}
+
+{% block content %}
+<section class="mobile-auth">
+    <div class="login-header-card">
+        <span class="eyebrow blue-eyebrow">Welcome Back</span>
+        <h1>Sign in to Quick Need</h1>
+        <p>Continue to book daily services, manage requests, and access your dashboard.</p>
+    </div>
+
+    <form method="POST" class="otp-card" autocomplete="off">
+        <h2>Sign In</h2>
+        <p>Enter your registered email and password to continue. Admin accounts will be redirected automatically.</p>
+
+        <label>Email</label>
+        <input type="email" name="email" placeholder="Enter your email" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+
+        <label>Password</label>
+        <input type="password" name="password" placeholder="Enter your password" autocomplete="new-password" required>
+
+        <button type="submit" class="primary-btn wide-btn">Continue</button>
+        <p class="muted-line center-text">New user? <a href="{{ url_for('signup') }}">Create account</a></p>
+    </form>
+</section>
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Quick Need Service App{% endblock %}
+{% block body_class %}auth-body{% endblock %}
+{% block page_shell_class %}auth-shell intro-shell{% endblock %}
+
+{% block content %}
+<section class="intro-card">
+    <div class="intro-orbit orbit-one"></div>
+    <div class="intro-orbit orbit-two"></div>
+
+    <div class="intro-content">
+        <span class="eyebrow blue-eyebrow">Premium Home Services</span>
+        <h1>QUICK NEED SERVICE APP</h1>
+        <p>For all your daily services and more.</p>
+        <p class="intro-subcopy">Book trusted professionals, manage your requests, and track every service from one clean app experience.</p>
+
+        <a class="intro-cta" href="{{ url_for('login') }}">
+            <span>Get Started</span>
+            <span class="arrow-mark">→</span>
+        </a>
+    </div>
+ </section>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}Offline | Quick Need{% endblock %}
+
+{% block content %}
+<section class="empty-state">
+    <span class="eyebrow">Offline mode</span>
+    <h1>You are offline right now.</h1>
+    <p>The app shell is available, but live booking actions need an internet connection. Reconnect and reopen the app to continue.</p>
+    <a class="primary-btn" href="{{ url_for('login') }}">Try again</a>
+</section>
+{% endblock %}
