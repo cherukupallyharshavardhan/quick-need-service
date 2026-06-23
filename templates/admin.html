@@ -247,6 +247,7 @@
             {% for provider in providers %}
             <form method="POST" action="{{ url_for('save_provider') }}" class="admin-edit-card">
                 <input type="hidden" name="provider_id" value="{{ provider.id }}">
+                <input type="hidden" name="current_slug" value="{{ provider.slug }}">
                 <div class="admin-edit-head">
                     <h3>{{ provider.name }}</h3>
                     <a class="danger-link" href="{{ url_for('delete_provider', provider_id=provider.id) }}">Delete</a>

@@ -1,17 +1,22 @@
+from __future__ import annotations
+
+import os
+import re
+import sqlite3
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
-import re
 
-import sqlite3
 from flask import Flask, flash, jsonify, redirect, render_template, request, session, url_for
+from werkzeug.security import check_password_hash, generate_password_hash
 
-
-app = Flask(__name__)
-app.secret_key = "quickneed_secret_key"
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "database.db"
+
+app = Flask(__name__)
+app.secret_key = os.environ.get("QUICKNEED_SECRET_KEY", "quickneed_secret")
+
 
 DEFAULT_SERVICES = {
     "electrician": {
@@ -63,6 +68,7 @@ DEFAULT_SERVICES = {
         "image": "https://images.unsplash.com/photo-1562259949-e8e7689d7828?auto=format&fit=crop&w=900&q=80",
     },
 }
+
 
 DEFAULT_PROVIDERS = {
     "electrician": [
@@ -199,6 +205,7 @@ DEFAULT_PROVIDERS = {
     ],
 }
 
+
 HELP_ITEMS = [
     {
         "question": "How do I book a service?",
@@ -218,58 +225,44 @@ HELP_ITEMS = [
     },
 ]
 
-ALLOWED_BOOKING_STATUSES = {
-    "Pending",
-    "Accepted",
-    "In Progress",
-    "Completed",
-    "Cancel Requested",
-    "Cancelled",
-}
 
-
-def get_db():
+def get_db() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 
-def column_exists(conn, table_name, column_name):
+def row_dict(row):
+    return dict(row) if row else None
+
+
+def slugify(value: str) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", "-", value.strip().lower())
+    return normalized.strip("-") or "item"
+
+
+def column_exists(conn: sqlite3.Connection, table_name: str, column_name: str) -> bool:
     columns = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
     return any(column["name"] == column_name for column in columns)
 
 
-def add_column_if_missing(conn, table_name, column_name, definition):
+def add_column_if_missing(conn: sqlite3.Connection, table_name: str, column_name: str, definition: str) -> None:
     if not column_exists(conn, table_name, column_name):
         conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
 
 
-def init_db():
+def init_db() -> None:
     conn = get_db()
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            full_name TEXT,
             email TEXT UNIQUE,
             phone TEXT,
+            city TEXT,
             password TEXT,
             role TEXT DEFAULT 'user'
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS bookings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_email TEXT,
-            service TEXT,
-            provider TEXT,
-            name TEXT,
-            address TEXT,
-            date TEXT,
-            time TEXT,
-            issue TEXT,
-            status TEXT DEFAULT 'Pending'
         )
         """
     )
@@ -303,31 +296,42 @@ def init_db():
         )
         """
     )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS bookings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_email TEXT,
+            service TEXT,
+            service_slug TEXT,
+            provider TEXT,
+            provider_slug TEXT,
+            customer_phone TEXT,
+            provider_phone TEXT,
+            name TEXT,
+            address TEXT,
+            date TEXT,
+            time TEXT,
+            issue TEXT,
+            amount INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'Pending',
+            created_at TEXT
+        )
+        """
+    )
 
     add_column_if_missing(conn, "users", "full_name", "TEXT")
+    add_column_if_missing(conn, "users", "phone", "TEXT")
     add_column_if_missing(conn, "users", "city", "TEXT")
+
+    add_column_if_missing(conn, "bookings", "service_slug", "TEXT")
+    add_column_if_missing(conn, "bookings", "provider_slug", "TEXT")
     add_column_if_missing(conn, "bookings", "customer_phone", "TEXT")
     add_column_if_missing(conn, "bookings", "provider_phone", "TEXT")
     add_column_if_missing(conn, "bookings", "amount", "INTEGER DEFAULT 0")
     add_column_if_missing(conn, "bookings", "created_at", "TEXT")
 
-    conn.execute(
-        """
-        UPDATE bookings
-        SET created_at = COALESCE(created_at, date || ' ' || time)
-        WHERE created_at IS NULL
-        """
-    )
-    conn.execute(
-        """
-        UPDATE users
-        SET full_name = COALESCE(NULLIF(full_name, ''), substr(email, 1, instr(email, '@') - 1))
-        WHERE email LIKE '%@%'
-        """
-    )
-
-    services_count = conn.execute("SELECT COUNT(*) FROM services").fetchone()[0]
-    if services_count == 0:
+    service_count = conn.execute("SELECT COUNT(*) FROM services").fetchone()[0]
+    if service_count == 0:
         for slug, service in DEFAULT_SERVICES.items():
             conn.execute(
                 """
@@ -345,8 +349,8 @@ def init_db():
                 ),
             )
 
-    providers_count = conn.execute("SELECT COUNT(*) FROM providers").fetchone()[0]
-    if providers_count == 0:
+    provider_count = conn.execute("SELECT COUNT(*) FROM providers").fetchone()[0]
+    if provider_count == 0:
         for service_slug, provider_list in DEFAULT_PROVIDERS.items():
             for provider in provider_list:
                 conn.execute(
@@ -367,63 +371,38 @@ def init_db():
                         provider["badge"],
                     ),
                 )
+
+    user_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    if user_count == 0:
+        conn.execute(
+            """
+            INSERT INTO users (full_name, email, phone, city, password, role)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "Admin",
+                "admin@quickneed.com",
+                "9999999999",
+                "Head Office",
+                generate_password_hash("admin123"),
+                "admin",
+            ),
+        )
+
+    conn.execute(
+        """
+        UPDATE bookings
+        SET created_at = COALESCE(created_at, date || ' ' || time)
+        WHERE created_at IS NULL
+        """
+    )
     conn.commit()
     conn.close()
 
 
-def login_required(view):
-    @wraps(view)
-    def wrapped_view(*args, **kwargs):
-        if "user_email" not in session:
-            flash("Please log in to continue.", "warning")
-            return redirect(url_for("login"))
-        return view(*args, **kwargs)
-
-    return wrapped_view
-
-
-def admin_required(view):
-    @wraps(view)
-    def wrapped_view(*args, **kwargs):
-        if session.get("role") != "admin":
-            flash("Admin access is required for that page.", "warning")
-            return redirect(url_for("home"))
-        return view(*args, **kwargs)
-
-    return wrapped_view
-
-
-def customer_required(view):
-    @wraps(view)
-    def wrapped_view(*args, **kwargs):
-        if session.get("role") == "admin":
-            flash("Please use the admin dashboard for admin access.", "warning")
-            return redirect(url_for("admin_dashboard"))
-        return view(*args, **kwargs)
-
-    return wrapped_view
-
-
-def get_current_user():
-    if "user_email" not in session:
-        return None
+def get_services(search_query: str = "") -> list[dict]:
     conn = get_db()
-    user = conn.execute(
-        "SELECT * FROM users WHERE email = ?",
-        (session["user_email"],),
-    ).fetchone()
-    conn.close()
-    return user
-
-
-def slugify(value):
-    normalized = re.sub(r"[^a-z0-9]+", "-", value.strip().lower())
-    return normalized.strip("-") or "item"
-
-
-def get_services(search_query=""):
-    conn = get_db()
-    services = conn.execute(
+    rows = conn.execute(
         """
         SELECT
             s.*,
@@ -436,53 +415,58 @@ def get_services(search_query=""):
     ).fetchall()
     conn.close()
 
-    results = [dict(service) for service in services]
+    services = [row_dict(row) for row in rows]
     if search_query:
-        query = search_query.strip().lower()
-        results = [
+        q = search_query.strip().lower()
+        services = [
             service
-            for service in results
-            if query in service["name"].lower() or query in service["tagline"].lower()
+            for service in services
+            if q in service["name"].lower() or q in service["tagline"].lower()
         ]
-    return results
+    return services
 
 
-def get_service(service_slug):
+def get_service(service_slug: str) -> dict | None:
     conn = get_db()
-    service = conn.execute(
-        "SELECT * FROM services WHERE slug = ?",
-        (service_slug,),
-    ).fetchone()
+    row = conn.execute("SELECT * FROM services WHERE slug = ?", (service_slug,)).fetchone()
     conn.close()
-    return service
+    return row_dict(row)
 
 
-def get_providers(service_slug=None):
+def get_providers(service_slug: str | None = None) -> list[dict]:
     conn = get_db()
     if service_slug:
-        providers = conn.execute(
+        rows = conn.execute(
             "SELECT * FROM providers WHERE service_slug = ? ORDER BY name",
             (service_slug,),
         ).fetchall()
     else:
-        providers = conn.execute(
-            "SELECT * FROM providers ORDER BY name"
-        ).fetchall()
+        rows = conn.execute("SELECT * FROM providers ORDER BY name").fetchall()
     conn.close()
-    return providers
+    return [row_dict(row) for row in rows]
 
 
-def get_provider(service_slug, provider_slug):
+def get_provider(service_slug: str, provider_slug: str) -> dict | None:
     conn = get_db()
-    provider = conn.execute(
+    row = conn.execute(
         "SELECT * FROM providers WHERE service_slug = ? AND slug = ?",
         (service_slug, provider_slug),
     ).fetchone()
     conn.close()
-    return provider
+    return row_dict(row)
 
 
-def booking_status_breakdown(bookings):
+def get_current_user() -> dict | None:
+    email = session.get("user_email")
+    if not email:
+        return None
+    conn = get_db()
+    row = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+    conn.close()
+    return row_dict(row)
+
+
+def booking_status_breakdown(bookings: list[dict]) -> dict:
     counts = {
         "total": len(bookings),
         "pending": 0,
@@ -493,7 +477,7 @@ def booking_status_breakdown(bookings):
         "cancelled": 0,
     }
     for booking in bookings:
-        status = (booking["status"] or "").strip().lower()
+        status = (booking.get("status") or "").strip().lower()
         if status == "pending":
             counts["pending"] += 1
         elif status == "accepted":
@@ -509,17 +493,80 @@ def booking_status_breakdown(bookings):
     return counts
 
 
-def filter_bookings(bookings, tab):
+def filter_bookings(bookings: list[dict], tab: str) -> list[dict]:
     tab = (tab or "upcoming").strip().lower()
     if tab == "completed":
-        return [booking for booking in bookings if (booking["status"] or "").strip().lower() == "completed"]
+        return [booking for booking in bookings if (booking.get("status") or "").strip().lower() == "completed"]
     if tab == "cancelled":
-        return [booking for booking in bookings if (booking["status"] or "").strip().lower() in {"cancelled", "cancel requested"}]
+        return [
+            booking
+            for booking in bookings
+            if (booking.get("status") or "").strip().lower() in {"cancelled", "cancel requested"}
+        ]
     return [
         booking
         for booking in bookings
-        if (booking["status"] or "").strip().lower() not in {"completed", "cancelled", "cancel requested"}
+        if (booking.get("status") or "").strip().lower() not in {"completed", "cancelled", "cancel requested"}
     ]
+
+
+def login_required(view):
+    @wraps(view)
+    def wrapped_view(*args, **kwargs):
+        if "user_email" not in session:
+            flash("Please sign in to continue.", "warning")
+            return redirect(url_for("login"))
+        return view(*args, **kwargs)
+
+    return wrapped_view
+
+
+def admin_required(view):
+    @wraps(view)
+    def wrapped_view(*args, **kwargs):
+        if session.get("role") != "admin":
+            flash("Admin access is required.", "warning")
+            return redirect(url_for("home"))
+        return view(*args, **kwargs)
+
+    return wrapped_view
+
+
+def customer_required(view):
+    @wraps(view)
+    def wrapped_view(*args, **kwargs):
+        if session.get("role") == "admin":
+            flash("Use the admin dashboard for admin access.", "warning")
+            return redirect(url_for("admin_dashboard"))
+        return view(*args, **kwargs)
+
+    return wrapped_view
+
+
+def verify_password(stored_password: str, entered_password: str) -> bool:
+    if not stored_password:
+        return False
+    if stored_password.startswith(("pbkdf2:", "scrypt:")):
+        return check_password_hash(stored_password, entered_password)
+    return stored_password == entered_password
+
+
+def maybe_upgrade_password(user_id: int, entered_password: str, stored_password: str) -> None:
+    if stored_password.startswith(("pbkdf2:", "scrypt:")):
+        return
+    conn = get_db()
+    conn.execute(
+        "UPDATE users SET password = ? WHERE id = ?",
+        (generate_password_hash(entered_password), user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def populate_session(user: dict) -> None:
+    session["user_email"] = user["email"]
+    session["role"] = user["role"] or "user"
+    session["display_name"] = user["full_name"] or user["email"].split("@")[0]
 
 
 @app.context_processor
@@ -548,19 +595,17 @@ def login():
         password = request.form.get("password", "").strip()
 
         conn = get_db()
-        user = conn.execute(
-            "SELECT * FROM users WHERE email = ? AND password = ?",
-            (email, password),
-        ).fetchone()
+        user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
         conn.close()
 
-        if not user:
+        if not user or not verify_password(user["password"], password):
             flash("Invalid email or password.", "danger")
             return render_template("login.html")
 
-        session["user_email"] = user["email"]
-        session["role"] = user["role"] or "user"
-        session["display_name"] = user["full_name"] or user["email"].split("@")[0]
+        user_dict = row_dict(user)
+        maybe_upgrade_password(user_dict["id"], password, user_dict["password"])
+        populate_session(user_dict)
+
         if session["role"] == "admin":
             flash("Welcome admin.", "success")
             return redirect(url_for("admin_dashboard"))
@@ -571,13 +616,16 @@ def login():
     return render_template("login.html")
 
 
-@app.route("/admin-login", methods=["GET", "POST"])
+@app.route("/admin-login")
 def admin_login():
     return redirect(url_for("login"))
 
 
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
+    if session.get("user_email"):
+        return redirect(url_for("home"))
+
     if request.method == "POST":
         full_name = request.form.get("full_name", "").strip()
         email = request.form.get("email", "").strip().lower()
@@ -589,16 +637,12 @@ def signup():
         if not all([full_name, email, phone, city, password, confirm]):
             flash("Please fill in every field.", "warning")
             return render_template("signup.html")
-
         if password != confirm:
             flash("Passwords do not match.", "danger")
             return render_template("signup.html")
 
         conn = get_db()
-        existing = conn.execute(
-            "SELECT id FROM users WHERE email = ?",
-            (email,),
-        ).fetchone()
+        existing = conn.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
         if existing:
             conn.close()
             flash("That email is already registered.", "warning")
@@ -609,11 +653,11 @@ def signup():
             INSERT INTO users (full_name, email, phone, city, password, role)
             VALUES (?, ?, ?, ?, ?, 'user')
             """,
-            (full_name, email, phone, city, password),
+            (full_name, email, phone, city, generate_password_hash(password)),
         )
         conn.commit()
         conn.close()
-        flash("Account created. Please log in.", "success")
+        flash("Account created. Please sign in.", "success")
         return redirect(url_for("login"))
 
     return render_template("signup.html")
@@ -623,11 +667,12 @@ def signup():
 @login_required
 @customer_required
 def home():
-    search_query = request.args.get("q", "").strip().lower()
+    search_query = request.args.get("q", "").strip()
     current_user = get_current_user()
     services = get_services(search_query)
+
     conn = get_db()
-    recent_bookings = conn.execute(
+    recent_rows = conn.execute(
         """
         SELECT * FROM bookings
         WHERE user_email = ?
@@ -636,20 +681,19 @@ def home():
         """,
         (session["user_email"],),
     ).fetchall()
-    user_booking_rows = conn.execute(
+    all_rows = conn.execute(
         "SELECT * FROM bookings WHERE user_email = ?",
         (session["user_email"],),
     ).fetchall()
     conn.close()
 
-    stats = booking_status_breakdown(user_booking_rows)
     return render_template(
         "home.html",
-        user_name=session.get("display_name", session["user_email"].split("@")[0]),
-        services=services,
-        recent_bookings=recent_bookings,
-        stats=stats,
+        user_name=session.get("display_name", "User"),
         current_user=current_user,
+        services=services,
+        recent_bookings=[row_dict(row) for row in recent_rows],
+        stats=booking_status_breakdown([row_dict(row) for row in all_rows]),
         search_query=search_query,
     )
 
@@ -660,9 +704,8 @@ def home():
 def service_detail(service_slug):
     service = get_service(service_slug)
     if not service:
-        flash("That service category was not found.", "warning")
+        flash("That service was not found.", "warning")
         return redirect(url_for("home"))
-
     return render_template(
         "service.html",
         service_slug=service_slug,
@@ -683,85 +726,62 @@ def book_service(service_slug, provider_slug):
         return redirect(url_for("home"))
 
     if request.method == "POST":
-        customer_name = request.form.get("name", "").strip()
+        name = request.form.get("name", "").strip()
         phone = request.form.get("phone", "").strip()
         address = request.form.get("address", "").strip()
         date = request.form.get("date", "").strip()
-        time = request.form.get("time", "").strip()
+        time_value = request.form.get("time", "").strip()
         issue = request.form.get("issue", "").strip()
 
-        if not all([customer_name, phone, address, date, time, issue]):
+        if not all([name, phone, address, date, time_value, issue]):
             flash("Please complete the booking form.", "warning")
             return render_template(
                 "book.html",
                 service=service,
                 service_slug=service_slug,
                 provider=provider,
+                current_user=get_current_user(),
                 today=datetime.now().strftime("%Y-%m-%d"),
             )
 
         conn = get_db()
-        conn.execute(
+        cursor = conn.execute(
             """
             INSERT INTO bookings (
-                user_email, service, provider, customer_phone, provider_phone, name, address,
-                date, time, issue, status, amount, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', ?, ?)
+                user_email, service, service_slug, provider, provider_slug, customer_phone,
+                provider_phone, name, address, date, time, issue, amount, status, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', ?)
             """,
             (
                 session["user_email"],
                 service["name"],
+                service_slug,
                 provider["name"],
+                provider_slug,
                 phone,
                 provider["phone"],
-                customer_name,
+                name,
                 address,
                 date,
-                time,
+                time_value,
                 issue,
                 provider["price"],
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             ),
         )
-        booking_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        booking_id = cursor.lastrowid
         conn.commit()
         conn.close()
-        flash(f"{service['name']} booking created with {provider['name']}.", "success")
+        flash("Booking confirmed.", "success")
         return redirect(url_for("booking_success", booking_id=booking_id))
 
-    current_user = get_current_user()
     return render_template(
         "book.html",
         service=service,
         service_slug=service_slug,
         provider=provider,
-        current_user=current_user,
+        current_user=get_current_user(),
         today=datetime.now().strftime("%Y-%m-%d"),
-    )
-
-
-@app.route("/my-bookings")
-@login_required
-@customer_required
-def my_bookings():
-    active_tab = request.args.get("tab", "upcoming").strip().lower()
-    conn = get_db()
-    bookings = conn.execute(
-        """
-        SELECT * FROM bookings
-        WHERE user_email = ?
-        ORDER BY id DESC
-        """,
-        (session["user_email"],),
-    ).fetchall()
-    conn.close()
-
-    return render_template(
-        "my_bookings.html",
-        bookings=bookings,
-        filtered_bookings=filter_bookings(bookings, active_tab),
-        active_tab=active_tab,
-        stats=booking_status_breakdown(bookings),
     )
 
 
@@ -778,7 +798,28 @@ def booking_success(booking_id):
     if not booking:
         flash("Booking not found.", "warning")
         return redirect(url_for("my_bookings"))
-    return render_template("booking_success.html", booking=booking)
+    return render_template("booking_success.html", booking=row_dict(booking))
+
+
+@app.route("/my-bookings")
+@login_required
+@customer_required
+def my_bookings():
+    active_tab = request.args.get("tab", "upcoming")
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM bookings WHERE user_email = ? ORDER BY id DESC",
+        (session["user_email"],),
+    ).fetchall()
+    conn.close()
+    bookings = [row_dict(row) for row in rows]
+    return render_template(
+        "my_bookings.html",
+        bookings=bookings,
+        filtered_bookings=filter_bookings(bookings, active_tab),
+        active_tab=active_tab,
+        stats=booking_status_breakdown(bookings),
+    )
 
 
 @app.route("/help")
@@ -801,11 +842,7 @@ def profile():
             flash("Please fill in all profile fields.", "warning")
         else:
             conn.execute(
-                """
-                UPDATE users
-                SET full_name = ?, phone = ?, city = ?
-                WHERE email = ?
-                """,
+                "UPDATE users SET full_name = ?, phone = ?, city = ? WHERE email = ?",
                 (full_name, phone, city, session["user_email"]),
             )
             conn.commit()
@@ -813,12 +850,12 @@ def profile():
             flash("Profile updated.", "success")
 
     user = get_current_user()
-    bookings = conn.execute(
+    rows = conn.execute(
         "SELECT * FROM bookings WHERE user_email = ? ORDER BY id DESC",
         (session["user_email"],),
     ).fetchall()
     conn.close()
-
+    bookings = [row_dict(row) for row in rows]
     return render_template(
         "profile.html",
         user=user,
@@ -842,16 +879,13 @@ def request_cancel(booking_id):
         flash("Booking not found.", "warning")
         return redirect(url_for("my_bookings"))
 
-    current_status = (booking["status"] or "").strip().lower()
-    if current_status in {"completed", "cancelled"}:
+    status = (booking["status"] or "").strip().lower()
+    if status in {"completed", "cancelled"}:
         conn.close()
         flash("That booking can no longer be cancelled.", "warning")
         return redirect(url_for("my_bookings"))
 
-    conn.execute(
-        "UPDATE bookings SET status = 'Cancel Requested' WHERE id = ?",
-        (booking_id,),
-    )
+    conn.execute("UPDATE bookings SET status = 'Cancel Requested' WHERE id = ?", (booking_id,))
     conn.commit()
     conn.close()
     flash("Cancellation request sent to admin.", "success")
@@ -863,23 +897,19 @@ def request_cancel(booking_id):
 @admin_required
 def admin_dashboard():
     conn = get_db()
-    bookings = conn.execute(
-        "SELECT * FROM bookings ORDER BY id DESC"
-    ).fetchall()
-    users = conn.execute(
-        "SELECT * FROM users ORDER BY id DESC"
-    ).fetchall()
+    booking_rows = conn.execute("SELECT * FROM bookings ORDER BY id DESC").fetchall()
+    user_rows = conn.execute("SELECT * FROM users ORDER BY id DESC").fetchall()
     conn.close()
+    bookings = [row_dict(row) for row in booking_rows]
     services = get_services()
     providers = get_providers()
-
     return render_template(
         "admin.html",
         bookings=bookings,
         services=services,
         providers=providers,
         stats=booking_status_breakdown(bookings),
-        user_count=len(users),
+        user_count=len(user_rows),
         service_count=len(services),
         provider_count=len(providers),
     )
@@ -890,27 +920,22 @@ def admin_dashboard():
 @admin_required
 def update_status(booking_id, status):
     normalized = status.replace("-", " ").title()
-    if normalized not in ALLOWED_BOOKING_STATUSES:
+    allowed = {"Pending", "Accepted", "In Progress", "Completed", "Cancel Requested", "Cancelled"}
+    if normalized not in allowed:
         flash("Unsupported booking status.", "warning")
         return redirect(url_for("admin_dashboard"))
 
     conn = get_db()
-    booking = conn.execute(
-        "SELECT id FROM bookings WHERE id = ?",
-        (booking_id,),
-    ).fetchone()
+    booking = conn.execute("SELECT id FROM bookings WHERE id = ?", (booking_id,)).fetchone()
     if not booking:
         conn.close()
         flash("Booking not found.", "warning")
         return redirect(url_for("admin_dashboard"))
 
-    conn.execute(
-        "UPDATE bookings SET status = ? WHERE id = ?",
-        (normalized, booking_id),
-    )
+    conn.execute("UPDATE bookings SET status = ? WHERE id = ?", (normalized, booking_id))
     conn.commit()
     conn.close()
-    flash(f"Booking #{booking_id} marked as {normalized}.", "success")
+    flash(f"Booking #{booking_id} updated.", "success")
     return redirect(url_for("admin_dashboard"))
 
 
@@ -923,7 +948,7 @@ def save_service():
     name = request.form.get("name", "").strip()
     tagline = request.form.get("tagline", "").strip()
     icon = request.form.get("icon", "").strip() or "SV"
-    price_from = request.form.get("price_from", "").strip() or "0"
+    price_from = int(request.form.get("price_from", "0") or 0)
     accent = request.form.get("accent", "").strip() or "blue"
     image = request.form.get("image", "").strip()
 
@@ -948,12 +973,10 @@ def save_service():
             SET slug = ?, name = ?, tagline = ?, icon = ?, price_from = ?, accent = ?, image = ?
             WHERE slug = ?
             """,
-            (slug, name, tagline, icon, int(price_from), accent, image, current_slug),
+            (slug, name, tagline, icon, price_from, accent, image, current_slug),
         )
-        conn.execute(
-            "UPDATE providers SET service_slug = ? WHERE service_slug = ?",
-            (slug, current_slug),
-        )
+        conn.execute("UPDATE providers SET service_slug = ? WHERE service_slug = ?", (slug, current_slug))
+        conn.execute("UPDATE bookings SET service_slug = ? WHERE service_slug = ?", (slug, current_slug))
         flash("Service updated.", "success")
     else:
         conn.execute(
@@ -961,7 +984,7 @@ def save_service():
             INSERT INTO services (slug, name, tagline, icon, price_from, accent, image)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (slug, name, tagline, icon, int(price_from), accent, image),
+            (slug, name, tagline, icon, price_from, accent, image),
         )
         flash("Service added.", "success")
 
@@ -976,6 +999,7 @@ def save_service():
 def delete_service(service_slug):
     conn = get_db()
     conn.execute("DELETE FROM providers WHERE service_slug = ?", (service_slug,))
+    conn.execute("DELETE FROM bookings WHERE service_slug = ?", (service_slug,))
     conn.execute("DELETE FROM services WHERE slug = ?", (service_slug,))
     conn.commit()
     conn.close()
@@ -991,10 +1015,10 @@ def save_provider():
     service_slug = request.form.get("service_slug", "").strip()
     slug = slugify(request.form.get("slug", "") or request.form.get("name", ""))
     name = request.form.get("name", "").strip()
-    rating = request.form.get("rating", "").strip() or "4.5"
+    rating = float(request.form.get("rating", "4.5") or 4.5)
     experience = request.form.get("experience", "").strip()
     eta = request.form.get("eta", "").strip()
-    price = request.form.get("price", "").strip() or "0"
+    price = int(request.form.get("price", "0") or 0)
     phone = request.form.get("phone", "").strip()
     badge = request.form.get("badge", "").strip()
 
@@ -1019,8 +1043,9 @@ def save_provider():
             SET service_slug = ?, slug = ?, name = ?, rating = ?, experience = ?, eta = ?, price = ?, phone = ?, badge = ?
             WHERE id = ?
             """,
-            (service_slug, slug, name, float(rating), experience, eta, int(price), phone, badge, int(provider_id)),
+            (service_slug, slug, name, rating, experience, eta, price, phone, badge, int(provider_id)),
         )
+        conn.execute("UPDATE bookings SET provider_slug = ? WHERE provider_slug = ?", (slug, request.form.get("current_slug", slug)))
         flash("Provider updated.", "success")
     else:
         conn.execute(
@@ -1028,7 +1053,7 @@ def save_provider():
             INSERT INTO providers (service_slug, slug, name, rating, experience, eta, price, phone, badge)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (service_slug, slug, name, float(rating), experience, eta, int(price), phone, badge),
+            (service_slug, slug, name, rating, experience, eta, price, phone, badge),
         )
         flash("Provider added.", "success")
 
@@ -1053,7 +1078,7 @@ def delete_provider(provider_id):
 def logout():
     session.clear()
     flash("You have been logged out.", "success")
-    return redirect(url_for("login"))
+    return redirect(url_for("intro"))
 
 
 @app.route("/manifest.webmanifest")
@@ -1062,11 +1087,11 @@ def manifest():
         {
             "name": "Quick Need Service",
             "short_name": "QuickNeed",
-            "start_url": url_for("login"),
+            "start_url": url_for("intro"),
             "scope": "/",
             "display": "standalone",
-            "background_color": "#f7f2e8",
-            "theme_color": "#0f766e",
+            "background_color": "#f4f8ff",
+            "theme_color": "#1f6fe5",
             "description": "Book trusted home services with a mobile-friendly installable app.",
             "icons": [
                 {
@@ -1095,4 +1120,4 @@ init_db()
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=True)
